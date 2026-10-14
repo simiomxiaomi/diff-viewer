@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="纯前端零依赖的文本对比工具：逐行差异高亮、并排与统一视图、字符级标记">
+<title>Diff Viewer · 文本对比器</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="backdrop" aria-hidden="true">
+  <span class="orb orb-a"></span>
+  <span class="orb orb-b"></span>
+  <span class="orb orb-c"></span>
+  <span class="grain"></span>
+</div>
+
+<div class="app">
+
+  <!-- ==================== 顶栏 ==================== -->
+  <header class="topbar glass">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">±</span>
+      <span class="brand-text">
+        <strong>Diff Viewer</strong>
+        <em>文本对比器</em>
+      </span>
+    </div>
+
+    <nav class="tabs" id="viewTabs" role="tablist" aria-label="视图切换">
+      <button class="tab is-active" type="button" role="tab" data-view="split" aria-selected="true">并排</button>
+      <button class="tab" type="button" role="tab" data-view="unified" aria-selected="false">统一</button>
+    </nav>
+
+    <div class="topbar-actions">
+      <button class="btn btn-ghost" id="swapBtn" type="button" title="交换左右两侧">
+        <span aria-hidden="true">⇄</span><span class="btn-label">交换</span>
+      </button>
+      <button class="btn btn-ghost" id="sampleBtn" type="button">
+        <span aria-hidden="true">✨</span><span class="btn-label">示例</span>
+      </button>
+      <button class="btn btn-ghost" id="exportHtmlBtn" type="button">
+        <span aria-hidden="true">🌐</span><span class="btn-label">导出 HTML</span>
+      </button>
+      <button class="btn btn-ghost" id="copyPatchBtn" type="button">
+        <span aria-hidden="true">⧉</span><span class="btn-label">复制补丁</span>
+      </button>
+      <button class="btn btn-primary" id="clearBtn" type="button">
+        <span aria-hidden="true">✕</span><span class="btn-label">清空</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ==================== 选项栏 ==================== -->
+  <section class="optbar glass" aria-label="对比选项">
+    <div class="opt-group">
+      <span class="opt-label">忽略</span>
+      <button class="chip" type="button" data-opt="ignoreCase" aria-pressed="false">大小写</button>
+      <button class="chip" type="button" data-opt="ignoreSpace" aria-pressed="true">行首尾空白</button>
+      <button class="chip" type="button" data-opt="ignoreAllSpace" aria-pressed="false">所有空白</button>
+      <button class="chip" type="button" data-opt="ignoreBlank" aria-pressed="true">空行</button>
+    </div>
+    <div class="opt-group">
+      <span class="opt-label">显示</span>
+      <button class="chip" type="button" data-opt="showLineNo" aria-pressed="true">行号</button>
+      <button class="chip" type="button" data-opt="inlineDiff" aria-pressed="true">字符级高亮</button>
+      <button class="chip" type="button" data-opt="contextOnly" aria-pressed="false">仅显示改动</button>
+    </div>
+    <div class="opt-spacer"></div>
+    <div class="opt-group">
+      <span class="opt-label">跳转</span>
+      <button class="mini-btn" id="prevBtn" type="button" title="上一处改动">↑</button>
+      <span class="nav-pos" id="navPos">—</span>
+      <button class="mini-btn" id="nextBtn" type="button" title="下一处改动">↓</button>
+    </div>
+  </section>
+
+  <!-- ==================== 主体 ==================== -->
+  <main class="workspace" id="workspace" data-view="split">
+
+    <!-- 左：原文 -->
+    <section class="pane glass" aria-label="原文">
+      <div class="pane-head">
+        <span class="pane-title">原文</span>
+        <div class="pane-tools">
+          <span class="pane-stat" id="leftStat">0 行</span>
+          <button class="chip" id="leftPasteBtn" type="button">粘贴</button>
+          <button class="chip" id="leftClearBtn" type="button">清空</button>
+        </div>
+      </div>
+      <textarea id="leftText" spellcheck="false" wrap="off" placeholder="把原始文本粘贴到这里"></textarea>
+    </section>
+
+    <!-- 右：新文 -->
+    <section class="pane glass" aria-label="新文本">
+      <div class="pane-head">
+        <span class="pane-title">新文</span>
+        <div class="pane-tools">
+          <span class="pane-stat" id="rightStat">0 行</span>
+          <button class="chip" id="rightPasteBtn" type="button">粘贴</button>
+          <button class="chip" id="rightClearBtn" type="button">清空</button>
+        </div>
+      </div>
+      <textarea id="rightText" spellcheck="false" wrap="off" placeholder="把修改后的文本粘贴到这里"></textarea>
+    </section>
+
+    <!-- 下：差异结果 -->
+    <section class="pane glass" aria-label="差异结果">
+      <div class="pane-head">
+        <span class="pane-title">差异</span>
+        <div class="pane-tools">
+          <span class="diff-tag add" id="statAdd">+0</span>
+          <span class="diff-tag del" id="statDel">−0</span>
+          <span class="diff-tag mod" id="statMod">~0</span>
+          <span class="pane-stat" id="statSame">0 行相同</span>
+          <span class="pane-stat" id="statTime">0.0 ms</span>
+        </div>
+      </div>
+      <div class="diff-scroll" id="diffScroll">
+        <div class="diff-body" id="diffBody"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==================== 状态栏 ==================== -->
+  <footer class="statusbar glass">
+    <span class="status-item" id="statusSummary">尚未对比</span>
+    <span class="status-item" id="statusSimilarity">相似度 —</span>
+    <span class="status-spacer"></span>
+    <span class="status-hint">左右实时对比 · 并排/统一视图 · ↑↓ 或 Alt+↑↓ 跳转改动</span>
+  </footer>
+
+</div>
+
+<!-- ==================== 补丁面板 ==================== -->
+<div class="overlay" id="patchOverlay" hidden>
+  <div class="modal glass" role="dialog" aria-modal="true" aria-label="补丁内容">
+    <div class="modal-head">
+      <span class="pane-title">统一差异格式（可用 git apply）</span>
+      <button class="drawer-close" id="patchClose" type="button" aria-label="关闭">✕</button>
+    </div>
+    <div class="modal-body">
+      <pre class="patch-pre" id="patchPre"></pre>
+      <div class="patch-actions">
+        <input type="text" id="patchRight" class="patch-input" value="新版本.txt" aria-label="新文件名">
+        <input type="text" id="patchLeft" class="patch-input" value="原版本.txt" aria-label="原文件名">
+        <button class="btn btn-primary slim" id="patchCopyBtn" type="button">复制</button>
+        <button class="btn btn-ghost slim" id="patchDownloadBtn" type="button">下载 .patch</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
